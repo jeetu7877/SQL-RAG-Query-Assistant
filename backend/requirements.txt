@@ -1,0 +1,18 @@
+# Web API
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-dotenv==1.2.4
+
+# PostgreSQL
+SQLAlchemy==2.1.1
+psycopg[binary]==3.3.6
+
+# Text-to-SQL: Vanna 0.7.x (legacy API) + ChromaDB vector store + Gemini
+vanna==0.7.9
+chromadb==0.6.3
+google-genai==2.26.0
+
+# SQL security validation
+sqlglot==30.21.0

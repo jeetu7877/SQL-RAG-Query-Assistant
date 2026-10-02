@@ -1,0 +1,21 @@
+# Optional sample PostgreSQL for local testing. Run: docker compose up -d
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: company_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: company_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - company_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d company_db"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  company_db_data:
