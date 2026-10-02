@@ -16,7 +16,8 @@ os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
 settings = get_settings()
 app = FastAPI(title="PostgreSQL Text-to-SQL AI Assistant", version="1.0.0")
 
-origins = {settings.frontend_url, "http://localhost:5173"}
+origins = {u.strip().rstrip("/") for u in settings.frontend_url.split(",") if u.strip()}
+origins.add("http://localhost:5173")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=sorted(origins),
