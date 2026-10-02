@@ -79,3 +79,62 @@ class SQLValidator:
             if projections and all(p.find(exp.AggFunc) for p in projections):
                 return tree  # e.g. SELECT COUNT(*) FROM users -> always one row
         return tree.limit(max_rows, copy=False)
+
+
+class InsertCheck:
+    """Result of validating a write statement."""
+
+    def __init__(self, sql: str, table: str, row_count: int | None):
+        self.sql = sql
+        self.table = table
+        self.row_count = row_count  # None when it cannot be known up front (INSERT ... SELECT)
+
+
+def validate_insert(sql: str, allowed_tables: set[str], max_rows: int, pretty: bool = True) -> InsertCheck:
+    """Allow exactly ONE plain INSERT into a known public table. Everything else is rejected."""
+    if not sql or not sql.strip():
+        raise SQLValidationError("Empty SQL.")
+    try:
+        statements = [s for s in sqlglot.parse(sql.strip(), read=DIALECT) if s is not None]
+    except SqlglotError:
+        raise SQLValidationError("The SQL could not be parsed.")
+    if len(statements) != 1:
+        raise SQLValidationError("Exactly one SQL statement is allowed.")
+
+    tree = statements[0]
+    if not isinstance(tree, exp.Insert):
+        raise SQLValidationError("Write mode only allows INSERT statements.")
+
+    # nothing other than the root INSERT may modify data (blocks data-modifying CTEs etc.)
+    for node in tree.walk():
+        if node is tree:
+            continue
+        if isinstance(node, FORBIDDEN_NODES):
+            raise SQLValidationError(f"{type(node).__name__.upper()} operations are not allowed.")
+        if isinstance(node, exp.Func):
+            name = (node.sql_name() if not isinstance(node, exp.Anonymous) else node.name).lower()
+            if name in FORBIDDEN_FUNCTIONS:
+                raise SQLValidationError(f"Function {name}() is not allowed.")
+
+    if tree.args.get("returning"):
+        raise SQLValidationError("RETURNING is not allowed in write mode.")
+
+    conflict = tree.args.get("conflict")
+    if conflict is not None and "DO NOTHING" not in conflict.sql(dialect=DIALECT).upper():
+        raise SQLValidationError("ON CONFLICT ... DO UPDATE is not allowed (it modifies existing rows).")
+
+    target = tree.this.this if isinstance(tree.this, exp.Schema) else tree.this
+    if not isinstance(target, exp.Table):
+        raise SQLValidationError("The INSERT target must be a table.")
+    if target.catalog or (target.db and target.db.lower() != "public"):
+        raise SQLValidationError("Only tables in the public schema can be written to.")
+    if target.name.lower() not in {t.lower() for t in allowed_tables}:
+        raise SQLValidationError("The INSERT target is not a known table in this database.")
+
+    row_count = None
+    if isinstance(tree.expression, exp.Values):
+        row_count = len(tree.expression.expressions)
+        if row_count > max_rows:
+            raise SQLValidationError(f"At most {max_rows} rows can be inserted at once.")
+
+    return InsertCheck(tree.sql(dialect=DIALECT, pretty=pretty), target.name, row_count)

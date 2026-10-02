@@ -27,9 +27,22 @@ api.interceptors.request.use((config) => {
 // normalize errors to { message, status }
 api.interceptors.response.use(
   (r) => r,
-  (error) => {
+  async (error) => {
     const status = error.response?.status;
     let message = error.response?.data?.detail;
+
+    // Export endpoints return application/json errors even though successful
+    // downloads use responseType: "blob". Decode those errors here.
+    if (error.response?.data instanceof Blob) {
+      try {
+        const text = await error.response.data.text();
+        const parsed = JSON.parse(text);
+        message = parsed.detail;
+      } catch {
+        // Keep the generic fallback below.
+      }
+    }
+
     if (typeof message !== "string") {
       message = error.response
         ? "Something went wrong. Please try again."

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowRight, ChevronsDownUp, ChevronsUpDown, DatabaseZap, RefreshCw, Search } from "lucide-react";
+import { AlertCircle, ArrowRight, ChevronsDownUp, ChevronsUpDown, DatabaseZap, Download, FileSpreadsheet, RefreshCw, Search } from "lucide-react";
 import LoadingSpinner from "../components/LoadingSpinner";
 import SchemaTableCard from "../components/SchemaTableCard";
-import { fetchSchema } from "../services/databaseService";
+import { downloadDatabaseExport, fetchSchema } from "../services/databaseService";
 
 function Stat({ label, value }) {
   return (
@@ -19,6 +19,7 @@ export default function SchemaPage() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(() => new Set());
+  const [exporting, setExporting] = useState("");
 
   const load = useCallback(async (refresh = false) => {
     setLoading(true);
@@ -42,6 +43,18 @@ export default function SchemaPage() {
     return q ? all.filter((t) => t.name.toLowerCase().includes(q) || t.columns.some((c) => c.name.toLowerCase().includes(q))) : all;
   }, [schema, query]);
 
+  const download = async (format) => {
+    setExporting(format);
+    setError("");
+    try {
+      await downloadDatabaseExport(format);
+    } catch (err) {
+      setError(err.message || "Export failed.");
+    } finally {
+      setExporting("");
+    }
+  };
+
   const toggle = (name) =>
     setOpen((prev) => {
       const next = new Set(prev);
@@ -53,10 +66,23 @@ export default function SchemaPage() {
     <main className="flex-1 overflow-y-auto px-4 py-6">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">Database schema</h1>
-          <button onClick={() => load(true)} disabled={loading} className="btn-ghost">
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden /> Refresh
-          </button>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Database schema</h1>
+            <p className="mt-1 text-sm text-mute">Download the connected database as Excel or a ZIP of CSV files.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => download("csv")} disabled={!!exporting || loading} className="btn-ghost">
+              <Download className="h-4 w-4" aria-hidden />
+              {exporting === "csv" ? "Exporting..." : "CSV"}
+            </button>
+            <button onClick={() => download("xlsx")} disabled={!!exporting || loading} className="btn-primary">
+              <FileSpreadsheet className="h-4 w-4" aria-hidden />
+              {exporting === "xlsx" ? "Exporting..." : "Excel"}
+            </button>
+            <button onClick={() => load(true)} disabled={loading || !!exporting} className="btn-ghost">
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden /> Refresh
+            </button>
+          </div>
         </div>
 
         {loading && !schema && <LoadingSpinner label="Reading schema from PostgreSQL..." className="py-20" />}

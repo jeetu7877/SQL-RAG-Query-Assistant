@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import ChatWindow from "../components/ChatWindow";
 import Sidebar from "../components/Sidebar";
 import { useConnection } from "../context/ConnectionContext";
-import { askQuestion } from "../services/chatService";
+import { askQuestion, cancelWrite, confirmWrite, getServerInfo, previewWrite } from "../services/chatService";
 import { fetchSchema } from "../services/databaseService";
 
 let nextId = 1;
@@ -12,12 +12,12 @@ export default function ChatPage() {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [schema, setSchema] = useState(null);
+  const [writesEnabled, setWritesEnabled] = useState(false);
+  const [writeMode, setWriteMode] = useState(false); // always starts OFF
 
-  // schema is used only for the sidebar table count and dynamic example questions
   useEffect(() => {
-    fetchSchema()
-      .then(setSchema)
-      .catch(() => setSchema(null));
+    fetchSchema().then(setSchema).catch(() => setSchema(null));
+    getServerInfo().then((i) => setWritesEnabled(!!i.writes_enabled)).catch(() => setWritesEnabled(false));
   }, []);
 
   const suggestions = useMemo(() => {
@@ -33,21 +33,56 @@ export default function ChatPage() {
     [messages]
   );
 
+  const patch = (id, changes) =>
+    setMessages((all) => all.map((m) => (m.id === id ? { ...m, ...changes } : m)));
+
   const send = useCallback(
     async (question) => {
       if (loading) return;
       setMessages((m) => [...m, { id: nextId++, role: "user", text: question }]);
       setLoading(true);
       try {
-        const data = await askQuestion(question);
-        setMessages((m) => [...m, { id: nextId++, role: "assistant", data }]);
+        if (writeMode) {
+          const data = await previewWrite(question);
+          setMessages((m) => [...m, { id: nextId++, role: "assistant", kind: "write", data, status: "pending" }]);
+        } else {
+          const data = await askQuestion(question);
+          setMessages((m) => [...m, { id: nextId++, role: "assistant", data }]);
+        }
       } catch (err) {
         setMessages((m) => [...m, { id: nextId++, role: "assistant", error: true, text: err.message }]);
       } finally {
         setLoading(false);
       }
     },
-    [loading]
+    [loading, writeMode]
+  );
+
+  const onConfirmWrite = useCallback(
+    async (id) => {
+      const msg = messages.find((m) => m.id === id);
+      if (!msg || msg.status !== "pending") return;
+      patch(id, { status: "running" });
+      try {
+        const result = await confirmWrite(msg.data.token);
+        patch(id, { status: "done", result });
+        setWriteMode(false); // back to read-only after every successful write
+        fetchSchema(true).then(setSchema).catch(() => {});
+      } catch (err) {
+        patch(id, { status: "failed", error: err.message });
+      }
+    },
+    [messages]
+  );
+
+  const onCancelWrite = useCallback(
+    async (id) => {
+      const msg = messages.find((m) => m.id === id);
+      if (!msg || msg.status !== "pending") return;
+      patch(id, { status: "cancelled" });
+      cancelWrite(msg.data.token).catch(() => {});
+    },
+    [messages]
   );
 
   return (
@@ -57,8 +92,13 @@ export default function ChatPage() {
         messages={messages}
         loading={loading}
         onSend={send}
-        suggestions={suggestions}
+        suggestions={writeMode ? [] : suggestions}
         dbName={connection.database_name}
+        writesEnabled={writesEnabled}
+        writeMode={writeMode}
+        onToggleWrite={() => setWriteMode((v) => !v)}
+        onConfirmWrite={onConfirmWrite}
+        onCancelWrite={onCancelWrite}
       />
     </div>
   );

@@ -12,7 +12,7 @@ def _connect(client, db_url):
 
 
 def test_health(client):
-    assert client.get("/api/health").json() == {"status": "ok"}
+    assert client.get("/api/health").json()["status"] == "ok"
 
 
 def test_chat_requires_connection_header(client):

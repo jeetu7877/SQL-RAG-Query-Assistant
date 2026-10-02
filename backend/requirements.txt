@@ -16,3 +16,5 @@ google-genai==2.26.0
 
 # SQL security validation
 sqlglot==30.21.0
+
+openpyxl==3.1.5

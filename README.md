@@ -174,6 +174,21 @@ Answer:    There are 60 customers.
 Known limits: sessions are in memory (single worker; restart = reconnect), and there is no user login.
 Add authentication and HTTPS before exposing this to the internet.
 
+## Write mode (optional, INSERT only)
+
+Off by default. To enable, set on the server: `ALLOW_WRITES=true` (optional `MAX_WRITE_ROWS=50`).
+
+1. In the chat box turn on **Write mode (INSERT only)** (it always starts OFF).
+2. Describe the row, e.g. "add customer Rahul, rahul@example.com, Delhi". Gemini writes one INSERT.
+3. The server validates it with SQLGlot and shows the SQL + target table. **Nothing is saved yet.**
+4. Click **Confirm insert**. The server runs the exact statement it stored, in one transaction
+   (rolled back on any error or if more than `MAX_WRITE_ROWS` rows would be added).
+
+Guarantees: only a single plain `INSERT` into a known `public` table; no UPDATE/DELETE/DDL, no `RETURNING`,
+no `ON CONFLICT DO UPDATE`, no dangerous functions. The browser sends back only a single-use token (5 min,
+bound to the session), never SQL. The database user must have `INSERT` permission; a read-only role gets a
+clear error. Normal chat stays strictly read-only even when write mode is enabled.
+
 ## Deployment
 
 - Backend: `docker build -t pg-text2sql-api backend && docker run -p 8000:8000 --env-file backend/.env pg-text2sql-api`
@@ -192,6 +207,9 @@ Interactive docs at http://localhost:8000/docs.
 | POST | `/api/database/disconnect` | header `X-Connection-ID` |
 | GET  | `/api/database/schema` | header `X-Connection-ID`; optional `?refresh=true` |
 | POST | `/api/chat` | header `X-Connection-ID`; body `{"question": "..."}` |
+| POST | `/api/write/preview` | write mode only: body `{"question"}` -> `token`, `sql`, `table`, `row_count` |
+| POST | `/api/write/confirm` | write mode only: body `{"token"}` -> `inserted_rows` |
+| POST | `/api/write/cancel` | body `{"token"}` |
 
 Chat response:
 

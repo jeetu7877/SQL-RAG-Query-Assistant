@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, SendHorizontal, Sparkles } from "lucide-react";
+import { Loader2, PencilLine, SendHorizontal, Sparkles } from "lucide-react";
 import ChatMessage from "./ChatMessage";
 
-export default function ChatWindow({ messages, loading, onSend, suggestions, dbName }) {
+export default function ChatWindow({
+  messages, loading, onSend, suggestions, dbName,
+  writesEnabled, writeMode, onToggleWrite, onConfirmWrite, onCancelWrite,
+}) {
   const [draft, setDraft] = useState("");
   const endRef = useRef(null);
 
@@ -50,13 +53,13 @@ export default function ChatWindow({ messages, loading, onSend, suggestions, dbN
           )}
 
           {messages.map((m) => (
-            <ChatMessage key={m.id} message={m} />
+            <ChatMessage key={m.id} message={m} onConfirmWrite={onConfirmWrite} onCancelWrite={onCancelWrite} />
           ))}
 
           {loading && (
             <div className="flex items-center gap-3 text-sm text-mute" role="status">
               <Loader2 className="h-4 w-4 animate-spin text-accent" aria-hidden />
-              Generating SQL and running the query...
+              {writeMode ? "Preparing the insert (nothing is saved yet)..." : "Generating SQL and running the query..."}
             </div>
           )}
           <div ref={endRef} />
@@ -64,6 +67,29 @@ export default function ChatWindow({ messages, loading, onSend, suggestions, dbN
       </div>
 
       <form onSubmit={submit} className="border-t border-line bg-panel px-4 py-3">
+        {writesEnabled && (
+          <div className="mx-auto mb-2.5 flex max-w-4xl flex-wrap items-center gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={writeMode}
+              onClick={onToggleWrite}
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                writeMode
+                  ? "border-amber-400/60 bg-amber-400/15 text-amber-200"
+                  : "border-line text-mute hover:text-ink"
+              }`}
+            >
+              <PencilLine className="h-3.5 w-3.5" aria-hidden />
+              Write mode (INSERT only): {writeMode ? "ON" : "OFF"}
+            </button>
+            {writeMode && (
+              <span className="text-xs text-amber-200/80">
+                Your message becomes an INSERT you must confirm. Updates and deletes are never allowed.
+              </span>
+            )}
+          </div>
+        )}
         <div className="mx-auto flex max-w-4xl items-end gap-3">
           <textarea
             value={draft}
@@ -71,13 +97,13 @@ export default function ChatWindow({ messages, loading, onSend, suggestions, dbN
             onKeyDown={onKeyDown}
             rows={1}
             maxLength={1000}
-            placeholder="Ask a question about your database..."
+            placeholder={writeMode ? "Describe the row(s) to add, e.g. add customer Rahul, rahul@example.com, Delhi" : "Ask a question about your database..."}
             aria-label="Your question"
             className="max-h-40 min-h-[46px] flex-1 resize-none rounded-xl border border-line bg-base px-4 py-3 text-[15px] placeholder:text-mute/60 focus:border-accent focus:outline-none"
           />
           <button type="submit" disabled={!draft.trim() || loading} className="btn-primary h-[46px] !px-4" aria-label="Send question">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
-            <span className="hidden sm:inline">Send</span>
+            <span className="hidden sm:inline">{writeMode ? "Preview" : "Send"}</span>
           </button>
         </div>
       </form>

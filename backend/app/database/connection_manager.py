@@ -2,6 +2,7 @@
 
 The full database URL is never logged and never leaves the server.
 """
+import logging
 import threading
 import time
 import uuid
@@ -12,6 +13,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine, make_url
 
 from app.core.config import get_settings
+
+logger = logging.getLogger("connection_manager")
 
 
 class ConnectionError_(Exception):
@@ -59,8 +62,9 @@ class ConnectionManager:
         try:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
-        except Exception:
+        except Exception as exc:
             engine.dispose()
+            logger.error("DB connect failed: %s: %s", type(exc).__name__, (str(exc).splitlines() or [""])[0][:150])
             raise ConnectionError_(
                 "Unable to connect to the PostgreSQL database. Please verify the connection details."
             )

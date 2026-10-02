@@ -1,8 +1,9 @@
 import { AlertTriangle, Bot, User } from "lucide-react";
 import SqlBlock from "./SqlBlock";
 import ResultTable from "./ResultTable";
+import WriteConfirmCard from "./WriteConfirmCard";
 
-export default function ChatMessage({ message }) {
+export default function ChatMessage({ message, onConfirmWrite, onCancelWrite }) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end gap-3">
@@ -28,7 +29,13 @@ export default function ChatMessage({ message }) {
       </div>
 
       <div className="min-w-0 flex-1 space-y-3">
-        {message.error ? (
+        {message.kind === "write" ? (
+          <WriteConfirmCard
+            message={message}
+            onConfirm={() => onConfirmWrite(message.id)}
+            onCancel={() => onCancelWrite(message.id)}
+          />
+        ) : message.error ? (
           <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-[15px] text-red-200">
             {message.text}
           </p>

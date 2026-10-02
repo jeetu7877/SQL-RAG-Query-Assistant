@@ -1,21 +1,25 @@
-# Environment
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables / secrets
 .env
 .env.*
 !.env.example
 
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-
 # Node
 node_modules/
 dist/
+build/
 
-# Chroma / generated data
-chroma_db/
-.chroma/
+# Vite
+.vite/
 
 # IDE
 .vscode/
@@ -24,3 +28,16 @@ chroma_db/
 # OS
 .DS_Store
 Thumbs.db
+
+# Python tools
+.pytest_cache/
+.mypy_cache/
+
+# Chroma / local AI data
+.chroma/
+chroma_db/
+*.sqlite
+*.db
+
+# Logs
+*.log
